@@ -1,4 +1,4 @@
-# Attention Is All You Need — From Scratch
+# Attention Is All You Need - From Scratch
 
 PyTorch implementation of "Attention Is All You Need" (Vaswani et al., 2017) — trained on Multi30k En→De translation task.
 
@@ -34,6 +34,7 @@ This project implements the full encoder-decoder Transformer for sequence-to-seq
 - **Encoder and decoder stacks** with residual connections, layer normalization, and dropout
 - **Padding and causal masking** for both encoder self-attention and decoder autoregressive generation
 - **Greedy decoding** for inference
+- **Corpus BLEU evaluation** on the held-out test set (`sacrebleu`)
 - **Attention weight visualization** for interpretability (self-attention and cross-attention heatmaps)
 
 The model is trained on the **Multi30k** English–German parallel corpus, tokenized with spaCy, using the training setup described in the original paper (Adam with the paper's beta values, label smoothing, gradient clipping, and learning-rate-driven convergence).
@@ -94,6 +95,7 @@ Attention_is_all_you_need/
 │   ├── vocab_de.json           # German vocabulary
 │   └── loss_curve.png          # Train/val loss curve
 ├── inference.py                # Greedy autoregressive translation
+├── evaluate_bleu.py             # Corpus BLEU evaluation on the test split
 ├── requirements.txt
 ├── LICENSE
 └── README.md
@@ -152,11 +154,44 @@ translation = translate(model, "A man is playing guitar.", vocab_en, vocab_de, d
 
 The `notebooks/replicate_attention.ipynb` notebook contains attention weight heatmaps for both encoder self-attention and decoder cross-attention, useful for inspecting what the model attends to at each layer/head.
 
+### BLEU Evaluation
+
+```bash
+python evaluate_bleu.py
+```
+
+Runs greedy decoding over the full Multi30k test split (1,000 sentence pairs) and computes corpus BLEU using `sacrebleu`, printing the overall score, n-gram precision breakdown, and a handful of sample translations.
+
 ---
 
-## Training Results
+## Results
+
+### Training Loss
 
 Training and validation loss over epochs (with early stopping) are plotted automatically and saved to `Trained Model/loss_curve.png`.
+
+### BLEU Score
+
+Evaluated on the full Multi30k test split (1,000 sentence pairs) using greedy decoding:
+
+```
+Corpus BLEU: 23.79
+BLEU = 23.79  54.7/29.5/18.1/11.0  (BP = 1.000, ratio = 1.126, hyp_len = 13626, ref_len = 12106)
+```
+
+Published Multi30k En→De Transformer baselines typically fall in the ~30–38 BLEU range. This model scores below that range, for a few identifiable reasons rather than a broken pipeline, qualitatively, translations are largely fluent and semantically correct (see samples below):
+
+- **Reduced model capacity**: `d_model=256`, 3 layers, vs. the paper's 512/6 — a deliberate choice for faster iteration on limited hardware, at some cost to translation quality.
+- **Greedy decoding, not beam search**: the current `translate()` picks the single highest-probability token at each step. Beam search typically adds a few BLEU points on top of the same trained weights by exploring multiple candidate sequences instead of committing early.
+- **Vocabulary coverage (`min_freq=2`)**: rarer tokens (e.g. multi-word proper nouns like "Boston Terrier") fall back to `<unk>`, directly costing precision whenever they appear in the reference.
+
+Sample translations (greedy decode):
+
+| Source (EN) | Model Output (DE) | Reference (DE) |
+|---|---|---|
+| A man in an orange hat starring at something. | ein mann mit einem orangefarbenen hut betrachtet etwas an . | Ein Mann mit einem orangefarbenen Hut, der etwas anstarrt. |
+| A Boston Terrier is running on lush green grass in front of a white fence. | ein `<unk>` mit einem weißen zaun rennt auf dem rasen vor einem zaun . | Ein Boston Terrier läuft über saftig-grünes Gras vor einem weißen Zaun. |
+| People are fixing the roof of a house. | leute reparieren das dach eines hauses . | Leute Reparieren das Dach eines Hauses. |
 
 ---
 
