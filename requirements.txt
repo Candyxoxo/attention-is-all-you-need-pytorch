@@ -3,3 +3,4 @@ matplotlib==3.11.0
 PyYAML==6.0.3
 spacy==3.8.14
 torch==2.5.1+cu121
+sacrebleu
